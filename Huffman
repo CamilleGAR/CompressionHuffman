@@ -1,0 +1,166 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jan 23 08:20:25 2020
+
+@author: garnerca
+"""
+
+def frequence(texte):  #cree les listes caracteres et frequences
+    octets = 0
+    fichier = open(texte, "r")  #fichier a lire
+    liste_caracteres = [] #initialisation
+    liste_frequences = [] #initialisation
+    toutesleslignes = fichier.readlines()  #recuperation des lignes
+    for ligne in toutesleslignes :   #on traite chaque ligne
+        octets += len(ligne)
+        for caractere in ligne :   #on traite chaque caractere
+            if caractere in liste_caracteres :
+                index = liste_caracteres.index(caractere)
+                liste_frequences[index] += 1
+            else :
+                liste_caracteres += [caractere]
+                liste_frequences += [1]
+    fichier.close()  #ferme le fichier
+    l_triees = tri(liste_caracteres, liste_frequences)
+    return (l_triees[0], l_triees[1], octets)   #on trie les deux listes obtenues
+    
+def tri(lc, lf):   #on trie par ordre de frequence et d'ascii
+    length = len(lc)
+    lc_triee = []  #init liste caractere triee
+    lf_triee = []   #init liste frequence triee
+    l_indices = [i for i in range(length)]  #liste des  indices a trier
+    while l_indices != []:  #tant qu'on a pas fini de trier
+        f_min = lf[l_indices[0]]
+        i_min = l_indices[0]
+        for i in l_indices :   #on determine l'indice de frequence et ascii minimal
+            if lf[i] < f_min :
+                f_min = lf[i]
+                i_min = i
+            elif (lf[i] == f_min) and (ord(lc[i]) < ord(lc[i_min])):
+                f_min = lf[i]
+                i_min = i
+        lc_triee += [lc[i_min]]   #on rajouter le bon caractere
+        lf_triee += [f_min]  #on rajoute la bonne frequence
+        l_indices.remove(i_min)   #on retire l'indice traité
+    return(lc_triee,lf_triee)   #on retourne les deux listes triees
+                
+        
+class Tree:
+    def __init__(self, caractere, poids, fg, fd):
+        self.caractere = caractere
+        self.poids = poids
+        self.fg = fg
+        self.fd = fd
+        self.code = ''
+        
+    def get_poids(self):  #getter
+        return self.poids
+    
+    def get_caractere(self): #getter
+        return self.caractere
+    
+    def get_fg(self): #getter
+        return self.fg
+    
+    def get_fd(self): #getter
+        return self.fd
+    
+    def get_code(self): #getter
+        return self.code
+    
+    def set_code(self, code):  #setter
+        self.code = code
+        
+    def parcours_profondeur(self):
+        if self.get_fg() != None :
+            self.get_fg().set_code(self.get_code()+'0')
+            self.get_fg().parcours_profondeur()
+        if self.get_fd() != None :
+            self.get_fd().set_code(self.get_code()+'1')
+            self.get_fd().parcours_profondeur()
+        
+    
+def creer_arbre(texte, lc, lf):  #creation de l'arbre de codage
+    l_trees = []
+    for i in range(len(lc)) :  #On cree toutes les feuilles
+        l_trees += [Tree(lc[i], lf[i], None, None)]  #arbres en construction
+        l_feuilles = l_trees * 1  #feuilles
+    while len(l_trees) != 1 :
+        tree1 = l_trees.pop(0)
+        tree2 = l_trees.pop(0)
+        new_tree = Tree(None, tree1.get_poids() + tree2.get_poids(), tree1, tree2)
+        l_trees = inclure(new_tree,l_trees)
+    return (l_trees[0], l_feuilles)
+    
+def inclure(tree, listetree):  #integre le nouvel arbre à une liste d'arbres
+    for i in range(len(listetree)) :
+        if listetree[i].get_poids() >= tree.get_poids() :  #classe l'arbre en fonction de son poids
+            return (listetree[:i] + [tree] + listetree[i:])
+    return listetree + [tree]  #si le nouvel arbre est le dernier element
+
+def finaliser_code(texte, lc, lc_code): #code l'ensemble du texte une fois qu'on a le code de chaque lettre
+    fichier = open(texte, "r")  #fichier a lire
+    toutesleslignes = fichier.readlines()  #recuperation des lignes
+    code = ''
+    for ligne in toutesleslignes :   #on traite chaque ligne
+        for caractere in ligne :   #on traite chaque caractere
+            index = lc.index(caractere)
+            code += lc_code[index]
+    return code
+
+def fichier_alphabet(lc,lf, nom_fichier):
+    fichier_alphabet = open(nom_fichier + '_freq.txt', 'w')
+    fichier_alphabet.write(str(len(lc)))
+    fichier_alphabet.write('\n')
+    for i in range(len(lc)) :
+        fichier_alphabet.write(str(lc[i]))
+        fichier_alphabet.write(' ')
+        fichier_alphabet.write(str(lf[i]))
+        fichier_alphabet.write('\n')
+    fichier_alphabet.close()
+            
+def compresser(code) :
+    if len(code)%8 != 0 :
+        code += '0'*(8-len(code)%8)  #On complete si il manque des bits
+    code_compresse = ''
+    nb_iterations = len(code)//8
+    liste_octets = []
+    for i in range(nb_iterations): #on coupe par morceaux de 4 caracteres
+        liste_octets += [int(code[8*i:8*i+8],2)]  #Transforme en base 10 et ajoute à la liste
+    code_compresse = bytes(liste_octets) #transforme la liste en bytes
+    return code_compresse
+    
+def fichier_compresse(nom_fichier, l_compresse):
+    fichier = open(nom_fichier+'_comp.bin','wb')
+    fichier.write(l_compresse)
+    fichier.close()
+
+def taux_compression(texte,code_compresse, octets):
+    volume_initial = octets
+    volume_final = len(code_compresse)
+    return (1 - (volume_final / volume_initial))
+
+def main(nom_fichier):  #code le texte, le nom du fichier doit etre ecrit sans le .txt
+    texte = nom_fichier+'.txt'
+    lc, lf, octets_texte = frequence(texte)     #recupere les listes de caracteres et de frequences, lenombre d'octets du texte
+    lc_code = ['' for i in range(len(lc))] #liste des caracteres codés
+    tree, feuilles = creer_arbre(texte, lc, lf) # cree l'arbre
+    tree.parcours_profondeur() #recupere le code de chaque lettre
+    for f in feuilles :  #on recupere le code de toutes les feuilles (les caracteres)
+        caractere = f.get_caractere()
+        index = lc.index(caractere)
+        lc_code[index] = f.get_code()
+    code = finaliser_code(texte, lc, lc_code)
+    fichier_alphabet(lc,lf,nom_fichier)  #cree le fichier de l'alphabet
+    l_compresse = compresser(code) #compresse le code, liste compressee
+    octets_compresse = len(l_compresse)  #nombre d'octets du code compresse
+    fichier_compresse(nom_fichier, l_compresse) #cree le fichier du code
+    taux = (lambda volume_initial, volume_final : 1 - (volume_final/volume_initial))(octets_texte, octets_compresse)  #donne le taux de compression
+    bits_moyens = (lambda volume_init, volume_final : volume_init / volume_final)(octets_texte, octets_compresse) #donne le nombre moyen de bits de stockage d'un caractere du texte compresse
+    print('\nle texte est code sur ', octets_texte,' octets')
+    print('\nle texte compresse est code sur ', octets_compresse,' octets')
+    print('\nle taux de compression est de ', taux)
+    print('\nle nombre moyen de bits de stockage d\'un caractere du texte compresse est de', bits_moyens)
+    print('\nles fichiers de description de l\'alphabet, des frequences, et du texte compresse ont ete enregistres')
+    
+main('textesimple')
